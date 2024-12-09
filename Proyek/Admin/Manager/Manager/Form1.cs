@@ -15,6 +15,7 @@ namespace Manager
         public Form1()
         {
             InitializeComponent();
+            Message.Box("Hello");
         }
     }
 }
