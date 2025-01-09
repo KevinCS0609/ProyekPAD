@@ -76,9 +76,22 @@ CREATE TABLE `dtrans` (
   KEY `fk_produk` (`id_produk`),
   CONSTRAINT `fk_htrans` FOREIGN KEY (`id_htrans`) REFERENCES `htrans` (`id_htrans`),
   CONSTRAINT `fk_produk` FOREIGN KEY (`id_produk`) REFERENCES `produk` (`id_produk`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `dtrans` */
+
+insert  into `dtrans`(`id_dtrans`,`id_htrans`,`id_produk`,`nama_produk`,`jumlah`,`subtotal`,`diskon`) values 
+(1,1,1,'Tas Mini Serbaguna',5,225000.00,0.00),
+(2,2,2,'Bando Anak Warna-Warni',5,125000.00,12500.00),
+(3,3,4,'Gantungan Kunci Karakter',5,50000.00,2500.00),
+(4,4,2,'Bando Anak Warna-Warni',5,125000.00,12500.00),
+(5,5,2,'Bando Anak Warna-Warni',5,125000.00,12500.00),
+(6,6,3,'Jepit Rambut Elegan',5,75000.00,0.00),
+(7,7,4,'Gantungan Kunci Karakter',5,50000.00,2500.00),
+(8,8,6,'Pensil Mekanik 0.5',5,75000.00,7500.00),
+(9,9,2,'Bando Anak Warna-Warni',4,100000.00,10000.00),
+(10,9,8,'Highlighter Warna-Warni',2,50000.00,5000.00),
+(11,10,1,'Tas Mini Serbaguna',5,225000.00,22500.00);
 
 /*Table structure for table `htrans` */
 
@@ -87,7 +100,7 @@ DROP TABLE IF EXISTS `htrans`;
 CREATE TABLE `htrans` (
   `id_htrans` int(11) NOT NULL AUTO_INCREMENT,
   `id_pegawai` int(11) NOT NULL,
-  `id_member` int(11) DEFAULT NULL,
+  `id_member` varchar(255) DEFAULT NULL,
   `tanggal_transaksi` datetime DEFAULT NULL,
   `subtotal` decimal(10,2) DEFAULT NULL,
   `grandtotal` decimal(10,2) DEFAULT NULL,
@@ -96,9 +109,21 @@ CREATE TABLE `htrans` (
   PRIMARY KEY (`id_htrans`),
   KEY `fk_pegawai` (`id_pegawai`),
   CONSTRAINT `fk_pegawai` FOREIGN KEY (`id_pegawai`) REFERENCES `pegawai` (`id_pegawai`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `htrans` */
+
+insert  into `htrans`(`id_htrans`,`id_pegawai`,`id_member`,`tanggal_transaksi`,`subtotal`,`grandtotal`,`pajak`,`metode_pembayaran`) values 
+(1,1,NULL,'2025-01-08 10:17:05',249750.00,249750.00,0.00,2),
+(2,1,NULL,'2025-01-08 11:07:37',125000.00,132500.00,13750.00,1),
+(3,1,NULL,'2025-01-08 12:02:29',50000.00,53000.00,5500.00,3),
+(4,1,NULL,'2025-01-08 13:00:05',125000.00,138750.00,13750.00,1),
+(5,1,NULL,'2025-01-09 10:46:52',125000.00,138750.00,13750.00,2),
+(6,1,NULL,'2025-01-09 10:55:52',75000.00,83250.00,8250.00,2),
+(7,2,NULL,'2025-01-09 10:56:50',50000.00,55500.00,5500.00,1),
+(8,1,NULL,'2025-01-09 11:03:45',75000.00,83250.00,8250.00,3),
+(9,2,NULL,'2025-01-09 13:49:16',150000.00,166500.00,16500.00,3),
+(10,1,NULL,'2025-01-09 13:52:34',225000.00,249750.00,24750.00,3);
 
 /*Table structure for table `jenis` */
 
@@ -137,16 +162,18 @@ CREATE TABLE `jenis_member` (
   `lifetime` tinyint(1) DEFAULT 0,
   `description` varchar(255) DEFAULT NULL,
   `expired_date` date DEFAULT NULL,
-  `min_pembelian` decimal(10,2) DEFAULT NULL COMMENT 'Minimum pembelian untuk mendapat membership',
   `biaya_registrasi` decimal(10,2) DEFAULT NULL COMMENT 'Biaya pendaftaran membership',
+  `status` enum('Active','Expired') DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `jenis_member` */
 
-insert  into `jenis_member`(`id`,`nama_member`,`lifetime`,`description`,`expired_date`,`min_pembelian`,`biaya_registrasi`) values 
-(1,'Platinum',1,NULL,NULL,NULL,NULL),
-(2,'12.12 Sale',0,NULL,'2025-01-01',NULL,NULL);
+insert  into `jenis_member`(`id`,`nama_member`,`lifetime`,`description`,`expired_date`,`biaya_registrasi`,`status`) values 
+(1,'Platinum',1,NULL,NULL,10.00,'Active'),
+(2,'12.12 Sale',0,NULL,'2025-01-01',10.00,'Expired'),
+(3,'A Member',0,'System.Windows.Forms.TextBox, Text: Halo','2025-01-08',10.00,'Active'),
+(4,'B Member',0,'Halo','2025-01-08',10.00,'Active');
 
 /*Table structure for table `kategori` */
 
@@ -183,6 +210,10 @@ CREATE TABLE `member` (
 /*Data for the table `member` */
 
 insert  into `member`(`id_member`,`jenis_member`,`nomor_hp`,`status`,`tanggal_expired`) values 
+('B 2025010901',4,'08521234567','active',NULL),
+('B 2025010902',4,'08521234567','active',NULL),
+('B 2025010903',4,'08521234567','active',NULL),
+('B 2025010904',4,'08521234567','active',NULL),
 ('LT2025010101',1,'08113322771','active',NULL);
 
 /*Table structure for table `member_discount_rules` */
@@ -200,9 +231,13 @@ CREATE TABLE `member_discount_rules` (
   PRIMARY KEY (`id_rule`),
   KEY `id_jenis_member` (`id_jenis_member`),
   CONSTRAINT `member_discount_rules_ibfk_1` FOREIGN KEY (`id_jenis_member`) REFERENCES `jenis_member` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `member_discount_rules` */
+
+insert  into `member_discount_rules`(`id_rule`,`id_jenis_member`,`tipe_target`,`id_target`,`diskon_persen`,`diskon_nilai`,`excluded`) values 
+(3,3,'produk',1,10.00,NULL,0),
+(4,4,'kategori',1,10.00,NULL,0);
 
 /*Table structure for table `merk` */
 
@@ -305,14 +340,14 @@ CREATE TABLE `produk` (
 /*Data for the table `produk` */
 
 insert  into `produk`(`id_produk`,`nama_produk`,`id_merk`,`kategori`,`jenis`,`harga`,`stok`,`deskripsi`,`gambar`) values 
-(1,'Tas Mini Serbaguna',14,3,9,45000.00,50,'Tas kecil untuk menyimpan barang-barang kecil.',NULL),
-(2,'Bando Anak Warna-Warni',11,3,10,25000.00,100,'Bando dengan desain warna-warni untuk anak.',NULL),
-(3,'Jepit Rambut Elegan',12,3,11,15000.00,200,'Jepit rambut dengan hiasan elegan.',NULL),
-(4,'Gantungan Kunci Karakter',13,3,12,10000.00,300,'Gantungan kunci dengan karakter unik.',NULL),
+(1,'Tas Mini Serbaguna',14,3,9,45000.00,40,'Tas kecil untuk menyimpan barang-barang kecil.',NULL),
+(2,'Bando Anak Warna-Warni',11,3,10,25000.00,81,'Bando dengan desain warna-warni untuk anak.',NULL),
+(3,'Jepit Rambut Elegan',12,3,11,15000.00,195,'Jepit rambut dengan hiasan elegan.',NULL),
+(4,'Gantungan Kunci Karakter',13,3,12,10000.00,290,'Gantungan kunci dengan karakter unik.',NULL),
 (5,'Kalung Fashion Modis',15,3,13,75000.00,80,'Kalung dengan desain modis untuk berbagai acara.',NULL),
-(6,'Pensil Mekanik 0.5',1,1,1,15000.00,100,'Pensil mekanik dengan grip nyaman untuk menulis.',NULL),
+(6,'Pensil Mekanik 0.5',1,1,1,15000.00,95,'Pensil mekanik dengan grip nyaman untuk menulis.',NULL),
 (7,'Pulpen Gel Hitam',2,1,2,8000.00,300,'Pulpen gel dengan tinta hitam pekat.',NULL),
-(8,'Highlighter Warna-Warni',3,1,2,25000.00,50,'Set highlighter dengan warna cerah.',NULL),
+(8,'Highlighter Warna-Warni',3,1,2,25000.00,48,'Set highlighter dengan warna cerah.',NULL),
 (9,'Kertas HVS A4 80gsm',4,1,3,45000.00,120,'Kertas HVS ukuran A4, berat 80gsm.',NULL),
 (10,'Buku Catatan Hardcover',5,1,3,30000.00,100,'Buku catatan hardcover ukuran A5.',NULL),
 (11,'Mouse Gaming Logitech G502',6,2,6,650000.00,50,'Mouse gaming dengan DPI tinggi dan 11 tombol.',NULL),
@@ -337,13 +372,14 @@ CREATE TABLE `promo` (
   `status` enum('active','inactive','pending','expired') NOT NULL DEFAULT 'pending',
   `min_pembelian` decimal(10,2) DEFAULT NULL COMMENT 'Minimum pembelian untuk promo',
   `max_diskon` decimal(10,2) DEFAULT NULL COMMENT 'Maksimum nilai diskon',
+  `syarat_member` int(11) DEFAULT NULL,
   PRIMARY KEY (`id_promo`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `promo` */
 
-insert  into `promo`(`id_promo`,`Nama_Promo`,`expired_date`,`status`,`min_pembelian`,`max_diskon`) values 
-(1,'New Year Promo 2024','2025-01-07','active',NULL,NULL);
+insert  into `promo`(`id_promo`,`Nama_Promo`,`expired_date`,`status`,`min_pembelian`,`max_diskon`,`syarat_member`) values 
+(1,'New Year Promo 2024','2025-01-07','active',NULL,NULL,NULL);
 
 /*Table structure for table `promo_rules` */
 
@@ -358,12 +394,15 @@ CREATE TABLE `promo_rules` (
   PRIMARY KEY (`id_rule`),
   KEY `id_promo` (`id_promo`),
   CONSTRAINT `promo_rules_ibfk_1` FOREIGN KEY (`id_promo`) REFERENCES `promo` (`id_promo`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 /*Data for the table `promo_rules` */
 
 insert  into `promo_rules`(`id_rule`,`id_promo`,`tipe_target`,`id_target`,`diskon_persen`) values 
-(1,1,'kategori',1,10.00);
+(1,1,'kategori',1,10.00),
+(2,1,'produk',1,10.00),
+(3,1,'produk',2,10.00),
+(4,1,'produk',4,5.00);
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
