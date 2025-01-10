@@ -1,0 +1,172 @@
+ private void loadDataPromo()
+        {
+
+            try
+            {
+                string kueri = "SELECT id_promo AS 'ID', Nama_Promo as 'Nama Promo', expired_date AS 'Expired Date', start_date As 'Start Date' FROM promo";
+                MySqlDataAdapter adapter = new MySqlDataAdapter(kueri, conn);
+                DataTable dt = new DataTable();
+                adapter.Fill(dt);
+                dgvPromo.DataSource = dt;
+            }
+            catch
+            {
+
+            }
+
+        }
+
+        private void btnAddNewPromo_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string status = (dtpExpiredDatePromo.Value < DateTime.Now) ? "inactive" : "active";
+
+                string query = "INSERT INTO promo (Nama_Promo, expired_date, start_date, status) VALUES (@nama, @expired, @start, @status)";
+
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@nama", tbNamaPromo.Text);
+                cmd.Parameters.AddWithValue("@expired", dtpExpiredDatePromo.Value);
+                cmd.Parameters.AddWithValue("@start", DateTime.Now);
+                cmd.Parameters.AddWithValue("@status", status);
+
+                cmd.ExecuteNonQuery();
+
+                loadDataPromo();
+
+                MessageBox.Show("Promo berhasil ditambahkan", "Informasi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Terjadi kesalahan: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        private void dgvPromo_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                DataGridViewRow row = dgvPromo.Rows[e.RowIndex];
+
+                if (row.Cells["Start Date"].Value != DBNull.Value && row.Cells["Expired Date"].Value != DBNull.Value)
+                {
+                    DateTime startDate = Convert.ToDateTime(row.Cells["Start Date"].Value);
+                    DateTime expiredDate = Convert.ToDateTime(row.Cells["Expired Date"].Value);
+
+                    if (startDate < expiredDate)
+                    {
+                        row.DefaultCellStyle.BackColor = Color.Green;
+                    }
+                    else
+                    {
+                        row.DefaultCellStyle.BackColor = Color.Red;
+                    }
+                }
+                else
+                {
+                    row.DefaultCellStyle.BackColor = Color.Gray;
+                }
+            }
+        }
+
+
+        private void dgvPromo_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                dtpExpiredDatePromo.Enabled = true;
+                btnAddNewPromo.Enabled = false;
+                btnUpdatePromo.Enabled = true;
+                btnClearPromo.Enabled = false;
+                buttondetailpromo.Enabled = true;
+
+                var selectedRow = dgvPromo.Rows[e.RowIndex];
+
+                tbIDPromo.Text = selectedRow.Cells["ID"].Value.ToString();
+                tbNamaPromo.Text = selectedRow.Cells["Nama Promo"].Value.ToString();
+
+                var expiredDate = selectedRow.Cells["Expired Date"].Value;
+                var startDate = selectedRow.Cells["Start Date"].Value;
+
+                idSelectedPromo = Convert.ToInt32(selectedRow.Cells["ID"].Value);
+
+                if (expiredDate != DBNull.Value)
+                {
+                    dtpExpiredDatePromo.Value = Convert.ToDateTime(expiredDate);
+                }
+
+                if (startDate != DBNull.Value)
+                {
+                    dtpStartDatePromo.Value = Convert.ToDateTime(startDate);
+                }
+            }
+        }
+
+
+
+        int idSelectedPromo = 0;
+        private void button25_Click(object sender, EventArgs e)
+        {
+            loadDataPromo();
+            tabControl1.SelectedTab = tabPage7;
+            btnAddNewPromo.Enabled = true;
+            btnUpdatePromo.Enabled = false;
+            btnClearPromo.Enabled = false;
+            buttondetailpromo.Enabled = false;
+        }
+
+        private void buttondetailpromo_Click(object sender, EventArgs e)
+        {
+            cbTargetDetailPromo.Items.Add("kategori");
+            cbTargetDetailPromo.Items.Add("merk");
+            cbTargetDetailPromo.Items.Add("produk");
+            loadDetailPromo();
+            tabControl1.SelectedTab = tabPage6;
+
+        }
+
+        private void btnUpdatePromo_Click(object sender, EventArgs e)
+        {
+            if (idSelectedPromo <= 0)
+            {
+                MessageBox.Show("Pilih promo yang akan diupdate.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                string query = "UPDATE promo SET Nama_Promo = @NamaPromo, expired_date = @ExpiredDate, start_date = @StartDate, status = @Status WHERE id_promo = @ID";
+
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@NamaPromo", tbNamaPromo.Text);
+                    cmd.Parameters.AddWithValue("@ExpiredDate", dtpExpiredDatePromo.Value);
+                    cmd.Parameters.AddWithValue("@StartDate", dtpStartDatePromo.Value);
+                    cmd.Parameters.AddWithValue("@Status", (dtpExpiredDatePromo.Value < DateTime.Now) ? "inactive" : "active");
+                    cmd.Parameters.AddWithValue("@ID", idSelectedPromo);
+
+                    cmd.ExecuteNonQuery();
+
+                    loadDataPromo();
+
+                    MessageBox.Show("Promo berhasil diupdate.", "Informasi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    clearPromo();
+                }
+
+                btnAddNewPromo.Enabled = true;
+                btnUpdatePromo.Enabled = false;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Terjadi kesalahan: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        private void clearPromo()
+        {
+            tbIDPromo.Text = "";
+            tbNamaPromo.Text = "";
+        }
