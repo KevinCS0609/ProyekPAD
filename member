@@ -1,0 +1,51 @@
+private void button9_Click_1(object sender, EventArgs e)
+        {
+            string query = "INSERT INTO jenis_member (nama_member, lifetime, expired_date, biaya_registrasi, description, status) VALUES (@nama_member, @lifetime, @expired_date, @biaya, @deskripsi, @status)";
+            DateTime selectedDate = dateTimePicker2.Value.Date;
+            try
+            {
+
+                    MySqlCommand cmd = new MySqlCommand(query, conn);
+                    cmd.Parameters.AddWithValue("@nama_member", textBox6.Text);
+                    cmd.Parameters.AddWithValue("@lifetime", is_lifetime);
+                    if (!is_lifetime)
+                    {
+                        cmd.Parameters.AddWithValue("@expired_date", selectedDate);
+                    }
+                    else
+                    {
+                        cmd.Parameters.AddWithValue("@expired_date", DBNull.Value);
+                    }
+                    cmd.Parameters.AddWithValue("@deskripsi", tbDeskripsiMember.Text);
+                if(selectedDate < DateTime.Now.Date)
+                {
+                    cmd.Parameters.AddWithValue("@status", "Expired");
+                }
+                else
+                {
+                    cmd.Parameters.AddWithValue("@status", "Active");
+                }
+                
+
+                cmd.Parameters.AddWithValue("@biaya", numericUpDownBiayaRegis.Value);
+                    cmd.ExecuteNonQuery();
+                    MessageBox.Show("Berhasil Add New Membership");
+                    loadDGVMember();
+                }
+            
+            catch
+            {
+                MessageBox.Show("Error");
+            }
+        }
+        private void Lifetime_CheckedChanged(object sender, EventArgs e)
+        {
+            if (Lifetime.Checked)
+            {
+                is_lifetime = true;
+                dateTimePicker2.Enabled = false;
+            }
+            else {
+                dateTimePicker2.Enabled = true;
+            }
+        }
