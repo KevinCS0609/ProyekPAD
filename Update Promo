@@ -24,7 +24,7 @@ private void loadDataPromo()
             cmd.Parameters.AddWithValue("@nama", tbNamaPromo.Text);
             cmd.Parameters.AddWithValue("@expired", dtpExpiredDatePromo.Value);
             cmd.Parameters.AddWithValue("@status", cbStatus.Text);
-
+            loadDataPromo();
             cmd.ExecuteNonQuery();
         }
 
