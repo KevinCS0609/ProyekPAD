@@ -1,0 +1,133 @@
+private void loadDataPromo()
+        {
+
+                try
+                {
+                    string kueri = "SELECT id_promo AS 'ID', Nama_Promo as 'Nama Promo', expired_date AS 'Expired Date', status, expired_date FROM promo";
+                    MySqlDataAdapter adapter = new MySqlDataAdapter(kueri, conn);
+                    DataTable dt = new DataTable();
+                    adapter.Fill(dt);
+                    dgvPromo.DataSource = dt;
+                }
+                catch
+                {
+                    
+                }
+            
+        }
+
+        private void btnAddNewPromo_Click(object sender, EventArgs e)
+        {
+            string query = "INSERT INTO promo (Nama_Promo, expired_date, status) VALUES (@nama, @expired, @status)";
+
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@nama", tbNamaPromo.Text);
+            cmd.Parameters.AddWithValue("@expired", dtpExpiredDatePromo.Value);
+            cmd.Parameters.AddWithValue("@status", cbStatus.Text);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        private void dgvPromo_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            foreach (DataGridViewRow row in dgvPromo.Rows)
+            {
+                if (row.Cells["status"].Value != null)
+                {
+                    string status = row.Cells["status"].Value.ToString();
+                    if (status == "active")
+                    {
+                        row.DefaultCellStyle.BackColor = Color.Green;
+                    }
+                    else if (status == "expired" || status == "inactive") {
+                        row.DefaultCellStyle.BackColor = Color.Red;
+                    }
+                    else
+                    {
+                        row.DefaultCellStyle.BackColor = Color.Yellow;
+                    }
+                }
+            }
+            dgvPromo.Columns["status"].Visible = false;
+        }
+
+        private void dgvPromo_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if ( e.RowIndex >= 0)
+            {
+                dtpExpiredDatePromo.Enabled = false;
+                btnAddNewPromo.Enabled = false;
+                btnUpdatePromo.Enabled = true;
+                btnClearPromo.Enabled = false;
+                buttondetailpromo.Enabled = true;
+                var selectedRow = dgvPromo.Rows[e.RowIndex];
+                tbIDPromo.Text = selectedRow.Cells["ID"].Value.ToString();
+                tbNamaPromo.Text = selectedRow.Cells["Nama Promo"].Value.ToString();
+                var cellValue = selectedRow.Cells["expired_date"].Value;
+                cbStatus.Text = selectedRow.Cells["status"].Value.ToString();
+                idSelectedPromo = Convert.ToInt32(selectedRow.Cells["ID"].Value);
+            }
+        }
+
+
+        int idSelectedPromo = 0;
+        private void button25_Click(object sender, EventArgs e)
+        {
+            cbStatus.Items.Add("active");
+            cbStatus.Items.Add("inactive");
+            cbStatus.Items.Add("expired");
+            cbStatus.Items.Add("pending");
+            loadDataPromo();
+            tabControl1.SelectedTab = tabPage7;
+            btnAddNewPromo.Enabled = true;
+            btnUpdatePromo.Enabled = false;
+            btnClearPromo.Enabled = false;
+            buttondetailpromo.Enabled = false;
+        }
+
+        private void buttondetailpromo_Click(object sender, EventArgs e)
+        {
+            cbTargetDetailPromo.Items.Add("kategori");
+            cbTargetDetailPromo.Items.Add("merk");
+            cbTargetDetailPromo.Items.Add("produk");
+            loadDetailPromo();
+            tabControl1.SelectedTab = tabPage6;
+
+        }
+
+        private void btnUpdatePromo_Click(object sender, EventArgs e)
+        {
+
+
+                string query = "UPDATE promo SET Nama_Promo = @NamaPromo, expired_date = @ExpiredDate, status = @Status WHERE id_promo = @ID";
+                using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@NamaPromo", tbNamaPromo.Text);       
+                    cmd.Parameters.AddWithValue("@ExpiredDate", dtpExpiredDatePromo.Value); 
+                    cmd.Parameters.AddWithValue("@Status", cbStatus.Text);             
+                    cmd.Parameters.AddWithValue("@ID", tbIDPromo.Text);                 
+
+                    cmd.ExecuteNonQuery();
+                    loadDataPromo();
+                    clearPromo();
+                }
+            
+
+        }
+
+        private void clearPromo()
+        {
+            tbIDPromo.Text = "";
+            tbNamaPromo.Text = "";
+            cbStatus.SelectedValue = -1;
+        }
+
+
+
+===============================================
+
+        private void tbNamaPromo_TextChanged(object sender, EventArgs e)
+        {
+            dtpExpiredDatePromo.Enabled = true;
+            btnAddNewPromo.Enabled = true;
+        }
