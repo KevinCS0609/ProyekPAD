@@ -1,0 +1,162 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace Manager
+{
+    public partial class AddProduk : Form
+    {
+
+        MySqlConnection conn = koneksi.getConn();
+        public AddProduk()
+        {
+            InitializeComponent();
+            merk();
+            kategori();
+            numericUpDownHarga.Maximum = 10000000000000;
+        }
+
+        private void merk()
+        {
+            try
+            {
+                string query = "SELECT * FROM merk";
+                using (MySqlCommand command = new MySqlCommand(query, conn))
+                {
+                    try
+                    {
+                        using (MySqlDataReader reader = command.ExecuteReader())
+                        {
+                            comboBoxMerk.DisplayMember = "nama_merk"; 
+                            comboBoxMerk.ValueMember = "id_merk";
+                            while (reader.Read())
+                            {
+                                comboBoxMerk.Items.Add(new
+                                {
+                                    id_merk = reader["id_merk"].ToString(),
+                                    nama_merk = reader["nama_merk"].ToString()
+                                });
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("An error occurred: " + ex.Message);
+                    }
+
+                }
+            }
+            catch
+            {
+
+            }
+        }
+        private void kategori()
+        {
+            try
+            {
+                string query = "SELECT * FROM kategori";
+                using (MySqlCommand command = new MySqlCommand(query, conn))
+                {
+                    try
+                    {
+                        using (MySqlDataReader reader = command.ExecuteReader())
+                        {
+                            comboBoxKategori.DisplayMember = "nama_kategori";
+                            comboBoxKategori.ValueMember = "id_kategori";
+                            while (reader.Read())
+                            {
+                                comboBoxKategori.Items.Add(new
+                                {
+                                    id_kategori = reader["id_kategori"].ToString(),
+                                    nama_kategori = reader["nama_kategori"].ToString()
+                                });
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("An error occurred: " + ex.Message);
+                    }
+
+                }
+            }
+            catch
+            {
+
+            }
+        }
+
+
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+
+
+                try
+                {
+
+                    string query = "INSERT INTO produk (nama_produk, id_merk, kategori, harga, stok, deskripsi) VALUES (@nama_produk, @id_merk, @id_kategori, @harga, @stok, @deskripsi)";
+
+                    using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@nama_produk", tbNama.Text);
+                        cmd.Parameters.AddWithValue("@id_merk", comboBoxMerk.SelectedIndex+1);
+                        cmd.Parameters.AddWithValue("@id_kategori", comboBoxKategori.SelectedIndex+1);
+                        cmd.Parameters.AddWithValue("@harga", numericUpDownHarga.Value);
+                        cmd.Parameters.AddWithValue("@stok", numstock.Value);
+                        cmd.Parameters.AddWithValue("@deskripsi", tbDeskripsi.Text);
+
+                        cmd.ExecuteNonQuery();
+
+                    }
+
+                string message = $"Produk berhasil ditambahkan!\n\n" +
+                 $"Nama Produk: {tbNama.Text}\n" +
+                 $"Merk: {comboBoxMerk.SelectedIndex}\n" +
+                 $"Kategori: {comboBoxKategori.SelectedIndex}\n" +
+                 $"Harga: Rp {numericUpDownHarga.Value:N2}\n" +
+                 $"Deskripsi: {tbDeskripsi.Text}";
+
+                MessageBox.Show(message, "Informasi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ClearData();
+
+                }
+                catch(Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            
+        }
+        private void ClearData()
+        {
+            tbDeskripsi.Text = "";
+            tbNama.Text = "";
+            numericUpDownHarga.Value = 0;
+            comboBoxKategori.SelectedIndex = -1;
+            comboBoxMerk.SelectedIndex = -1;
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            ClearData();
+        }
+
+        private void AddProduk_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void numericUpDownHarga_ValueChanged(object sender, EventArgs e)
+        {
+
+        }
+    }
+}
