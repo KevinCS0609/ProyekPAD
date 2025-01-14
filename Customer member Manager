@@ -1,0 +1,104 @@
+private void loadDGVJenis()
+        {
+            string query = "SELECT id AS 'ID', nama_member AS 'Nama', description AS 'Deskripsi', biaya_registrasi AS 'Biaya', status FROM jenis_member WHERE status = 'Active'";
+
+            MySqlDataAdapter adapter = new MySqlDataAdapter(query, conn);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+            dgvJenis.DataSource = dt;
+        }
+
+        private void loadDGVLIST()
+        {
+            string query = @"SELECT 
+                            nomor_hp AS 'Nomor'
+                        FROM
+                            member
+                        WHERE
+                            status = 'Active' AND jenis_member = @id_member; ";
+
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@id_member", selectedIDJenis); 
+            MySqlDataAdapter adapter = new MySqlDataAdapter(cmd);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+            dgvListMember.DataSource = dt;
+        }
+        int selectedIDJenis;
+        string namaMember;
+        private void dgvJenis_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+
+        }
+
+        private void button35_Click(object sender, EventArgs e)
+        {
+            string prefixId = namaMember.Substring(0, 2).ToUpper();
+
+            string tanggalSekarang = DateTime.Now.ToString("yyyyMMdd");
+
+            string getCountQuery = @"
+                    SELECT COUNT(*) 
+                    FROM member 
+                    WHERE id_member LIKE @IdPrefix";
+            conn.Open();
+            MySqlCommand countCommand = new MySqlCommand(getCountQuery, conn);
+            countCommand.Parameters.AddWithValue("@IdPrefix", $"{prefixId}{tanggalSekarang}%");
+
+            int count = Convert.ToInt32(countCommand.ExecuteScalar());
+
+            // 4. Buat ID member baru
+            string newId = $"{prefixId}{tanggalSekarang}{(count + 1).ToString("D2")}";
+
+            // 5. Query untuk menambahkan data member baru
+            string insertQuery = @"
+                    INSERT INTO member (id_member, nomor_hp, jenis_member, status) 
+                    VALUES (@IdMember, @NomorHp, @JenisMember, @Status)";
+
+            MySqlCommand insertCommand = new MySqlCommand(insertQuery, conn);
+            insertCommand.Parameters.AddWithValue("@IdMember", newId);
+            insertCommand.Parameters.AddWithValue("@NomorHp", textBox9.Text);
+            insertCommand.Parameters.AddWithValue("@JenisMember", selectedIDJenis);
+            insertCommand.Parameters.AddWithValue("@Status", "active");
+
+            int rowsAffected = insertCommand.ExecuteNonQuery();
+            if (rowsAffected > 0)
+            {
+                loadDGVLIST();
+                MessageBox.Show("Member berhasil ditambahkan!");
+                Console.WriteLine($"ID Member: {newId}");
+            }
+            else
+            {
+                Console.WriteLine("Gagal menambahkan member.");
+            }
+        }
+
+        private void button33_Click(object sender, EventArgs e)
+        {
+            tabControl1.SelectedTab = tabPage1;
+        }
+
+        private void button34_Click(object sender, EventArgs e)
+        {
+            tbJenisMember.Text = "";
+            textBox5.Text = "";
+        }
+
+        private void button14_Click_1(object sender, EventArgs e)
+        {
+            loadDGVJenis();
+            tabControl1.SelectedTab = tabPage11;
+        }
+
+        private void dgvJenis_CellDoubleClick_1(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                var selectedRow = dgvJenis.Rows[e.RowIndex];
+                tbJenisMember.Text = selectedRow.Cells["Nama"].Value.ToString();
+                selectedIDJenis = Convert.ToInt32(selectedRow.Cells["ID"].Value);
+                namaMember = selectedRow.Cells["Nama"].Value.ToString();
+                loadDGVLIST();
+            }
+        }
