@@ -1,0 +1,549 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+namespace Manager
+{
+    public partial class cashier : Form
+    {
+        private int selectedRowIndex = -1;
+        decimal totalPrice = 0;
+        List<int> idProduk = new List<int>();
+        string name;
+        int idpegawai;
+        MySqlConnection conn = koneksi.getConn();
+        public cashier(string name, int idpegawai)
+        {
+            InitializeComponent();
+            this.name = name;
+            this.idpegawai = idpegawai;
+            label1.Text = $"Welcome, {name}";
+            //-------default settings---------
+            buttondefault(btnLogout);
+            buttondefault(btncheckout);
+            buttondefault(btndelete);
+            buttondefault(btnupdate);
+            buttondefault(btnclear);
+            buttondefault(btnadd);
+            searchdefault();
+            btndelete.Enabled = false;
+            btnupdate.Enabled = false;
+
+            //--------view table------------
+            LoadDataBarang();
+            cart();
+        }
+
+        //-------defaultfunction----------
+        private void buttondefault(Button temp)
+        {
+            temp.FlatStyle = FlatStyle.Flat;
+            temp.FlatAppearance.BorderSize = 0;
+        }
+
+        private void searchdefault()
+        {
+            searchbox.Height = 40;
+        }
+
+        //--------data view table-----------
+        private void LoadDataBarang()
+        {
+            string query = @"SELECT p.id_produk, p.nama_produk, m.nama_merk, p.stok, p.harga 
+                     FROM produk p
+                     LEFT JOIN merk m ON p.id_merk = m.id_merk
+                     WHERE p.stok > 0 AND p.status = 'Active'";
+
+            try
+            {
+                MySqlDataAdapter adapter = new MySqlDataAdapter(query, conn);
+                DataTable dt = new DataTable();
+
+                adapter.Fill(dt);
+
+                dataGridView1.DataSource = dt;
+                dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
+                dataGridView1.Columns["id_produk"].HeaderText = "ID Produk";
+                dataGridView1.Columns["nama_produk"].HeaderText = "Nama Produk";
+                dataGridView1.Columns["nama_merk"].HeaderText = "Merk";
+                dataGridView1.Columns["stok"].HeaderText = "Stok";
+                dataGridView1.Columns["harga"].HeaderText = "Harga (Rp)";
+                dataGridView1.Columns["harga"].DefaultCellStyle.Format = "N0";
+            }
+            catch (MySqlException sqlEx)
+            {
+                MessageBox.Show($"MySQL Error: {sqlEx.Message}", "Load Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Load Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        private void cart()
+        {
+            dataGridView2.Columns.Clear();
+            dataGridView2.Columns.Add("Barang", "Barang");
+            dataGridView2.Columns.Add("Stok", "Stok");
+            dataGridView2.Columns.Add("Subtotal", "Subtotal (Rp)");
+            dataGridView2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dataGridView2.Columns["Barang"].FillWeight = 50;
+            dataGridView2.Columns["Stok"].FillWeight = 25;
+            dataGridView2.Columns["Subtotal"].FillWeight = 25;
+
+            dataGridView2.Columns["Subtotal"].ReadOnly = true;
+            dataGridView2.Columns["Barang"].ReadOnly = true;
+            dataGridView2.Columns["Stok"].ReadOnly = true;
+        }
+
+        //-------Button or All Action-----------
+
+        private void btnLogout_Click(object sender, EventArgs e)
+        {
+
+        }
+
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            btnupdate.Enabled = false;
+            btndelete.Enabled = false;
+            btnadd.Enabled = true;
+            var selectedRow = dataGridView1.Rows[e.RowIndex];
+            textproductid.Text = selectedRow.Cells["id_produk"].Value.ToString();
+            textproductname.Text = selectedRow.Cells["nama_produk"].Value.ToString();
+            textprice.Text = selectedRow.Cells["harga"].Value.ToString();
+            textmerk.Text = selectedRow.Cells["nama_merk"].Value.ToString();
+            textstok.Text = selectedRow.Cells["stok"].Value.ToString();
+
+            string query = @"
+                    SELECT 
+                        k.nama_kategori, 
+                        j.nama_jenis
+                    FROM produk p
+                    LEFT JOIN kategori k ON p.kategori = k.id_kategori
+                    LEFT JOIN jenis j ON p.jenis = j.id_jenis
+                    WHERE p.id_produk = @id_produk";
+
+
+            using (var cmd = new MySqlCommand(query, conn))
+            {
+                cmd.Parameters.AddWithValue("@id_produk", textproductid.Text);
+
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        textcategory.Text = reader["nama_kategori"]?.ToString() ?? string.Empty;
+                        textjenis.Text = reader["nama_jenis"]?.ToString() ?? string.Empty;
+                    }
+                }
+            }
+        }
+
+        private void btnadd_Click(object sender, EventArgs e)
+        {
+            string productName = textproductname.Text;
+            int quantity;
+            decimal price;
+
+            if (int.TryParse(numquantity.Text, out quantity) && quantity > 0 && decimal.TryParse(textprice.Text, out price))
+            {
+                bool isProductExists = false;
+
+                foreach (DataGridViewRow row in dataGridView2.Rows)
+                {
+                    if (row.Cells["Barang"].Value?.ToString() == productName)
+                    {
+                        isProductExists = true;
+
+                        int currentQuantity = Convert.ToInt32(row.Cells["Stok"].Value);
+
+                        int availableStock = Convert.ToInt32(textstok.Text);
+
+                        if (currentQuantity + quantity <= availableStock)
+                        {
+                            row.Cells["Stok"].Value = currentQuantity + quantity;
+
+                            decimal newSubtotal = price * (currentQuantity + quantity);
+                            row.Cells["Subtotal"].Value = string.Format(new System.Globalization.CultureInfo("id-ID"), "Rp {0:N0}", newSubtotal);
+
+                            UpdateTotalPrice();
+                        }
+                        else
+                        {
+                            MessageBox.Show("Stok tidak mencukupi untuk menambahkan barang.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+
+                        return;
+                    }
+                }
+
+                if (!isProductExists)
+                {
+                    int availableStock = Convert.ToInt32(textstok.Text);
+
+                    if (quantity <= availableStock)
+                    {
+                        decimal subtotal = price * quantity;
+                        string subtotals = string.Format(new System.Globalization.CultureInfo("id-ID"), "Rp {0:N0}", subtotal);
+
+                        dataGridView2.Rows.Add(productName, quantity, subtotals);
+                        UpdateTotalPrice();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Stok tidak mencukupi untuk barang yang ditambahkan.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+            }
+            else
+            {
+                MessageBox.Show("Pastikan quantity dan price valid.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            clear();
+        }
+
+        private void dataGridView2_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < dataGridView2.Rows.Count)
+            {
+                btnadd.Enabled = false;
+                btndelete.Enabled = true;
+                btnupdate.Enabled = true;
+                selectedRowIndex = e.RowIndex;
+                string productName = dataGridView2.Rows[e.RowIndex].Cells["Barang"].Value?.ToString();
+
+                string quantityText = dataGridView2.Rows[e.RowIndex].Cells["Stok"].Value?.ToString();
+
+                if (!string.IsNullOrEmpty(productName))
+                {
+                    LoadProductDetailsFromDatabase(productName);
+                    if (int.TryParse(quantityText, out int quantity))
+                    {
+                        numquantity.Text = quantity.ToString();
+                    }
+                }
+                btnadd.Enabled = false;
+            }
+        }
+
+        private void btnupdate_Click(object sender, EventArgs e)
+        {
+            if (selectedRowIndex >= 0)
+            {
+                int newQuantity;
+
+                if (int.TryParse(numquantity.Text, out newQuantity))
+                {
+                    if (newQuantity == 0)
+                    {
+                        MessageBox.Show("Jumlah stok tidak boleh 0. Silakan masukkan jumlah yang valid.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    string productName = dataGridView2.Rows[selectedRowIndex].Cells["Barang"].Value?.ToString();
+
+                    if (!string.IsNullOrEmpty(productName))
+                    {
+                        int availableStock = -1;
+                        foreach (DataGridViewRow row in dataGridView1.Rows)
+                        {
+                            if (row.Cells["nama_produk"].Value?.ToString() == productName)
+                            {
+                                availableStock = Convert.ToInt32(row.Cells["stok"].Value);
+                                break;
+                            }
+                        }
+
+                        if (availableStock == -1)
+                        {
+                            MessageBox.Show("Stok produk tidak ditemukan di database. Silakan periksa data.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+
+                        if (newQuantity > availableStock)
+                        {
+                            MessageBox.Show($"Jumlah stok yang dimasukkan ({newQuantity}) melebihi stok yang tersedia ({availableStock}).", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+
+                        dataGridView2.Rows[selectedRowIndex].Cells["Stok"].Value = newQuantity.ToString();
+
+                        try
+                        {
+                            decimal price = GetPriceFromDatabase(productName);
+
+                            if (price > 0)
+                            {
+                                decimal newSubtotal = price * newQuantity;
+                                dataGridView2.Rows[selectedRowIndex].Cells["Subtotal"].Value = string.Format(new System.Globalization.CultureInfo("id-ID"), "Rp {0:N0}", newSubtotal);
+                                UpdateTotalPrice();
+                            }
+                            else
+                            {
+                                MessageBox.Show("Harga produk tidak ditemukan di database. Silakan periksa data.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Terjadi kesalahan saat mengambil harga dari database: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Nama produk tidak valid. Silakan periksa data.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Harap masukkan jumlah yang valid untuk stok.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Silakan pilih baris yang akan diperbarui.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            clear();
+        }
+
+
+        private void btndelete_Click(object sender, EventArgs e)
+        {
+            if (selectedRowIndex >= 0)
+            {
+                DialogResult result = MessageBox.Show("Apakah Anda yakin ingin menghapus baris ini?", "Konfirmasi Penghapusan", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (result == DialogResult.Yes)
+                {
+                    dataGridView2.Rows.RemoveAt(selectedRowIndex);
+                    selectedRowIndex = -1;
+                    UpdateTotalPrice();
+                }
+            }
+            else
+            {
+                MessageBox.Show("Silakan pilih baris yang ingin dihapus.", "Peringatan", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            UpdateTotalPrice();
+            clear();
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            string searchQuery = searchbox.Text.Trim();
+            FilterDataGridView(searchQuery);
+        }
+
+        private void searchbox_TextChanged(object sender, EventArgs e)
+        {
+            string searchQuery = searchbox.Text.Trim();
+            FilterDataGridView(searchQuery);
+        }
+
+        private void btnclear_Click(object sender, EventArgs e)
+        {
+            clear();
+        }
+
+        private void btncheckout_Click(object sender, EventArgs e)
+        {
+            if (totalPrice > 0)
+            {
+                List<Tuple<int, int>> productQuantities = new List<Tuple<int, int>>();
+
+
+                foreach (DataGridViewRow row in dataGridView2.Rows)
+                {
+                    if (row.Cells["Barang"].Value != null && row.Cells["Stok"].Value != null)
+                    {
+                        string namaProduk = row.Cells["Barang"].Value.ToString();
+                        int quantity = Convert.ToInt32(row.Cells["Stok"].Value);
+
+                        string query = "SELECT id_produk FROM produk WHERE nama_produk = @nama_produk";
+
+                        using (MySqlCommand cmd = new MySqlCommand(query, conn))
+                        {
+                            cmd.Parameters.AddWithValue("@nama_produk", namaProduk);
+
+                            var result = cmd.ExecuteScalar();
+                            if (result != null)
+                            {
+                                int idProduk = Convert.ToInt32(result);
+
+                                productQuantities.Add(new Tuple<int, int>(idProduk, quantity));
+                            }
+                        }
+                    }
+                }
+
+
+                if (productQuantities.Count > 0)
+                {
+                    koneksi.closeConn();
+                    checkout co = new checkout(this, productQuantities, name, idpegawai);
+                    this.Hide();
+                    co.ShowDialog();
+                }
+                else
+                {
+                    MessageBox.Show("Tidak ada barang yang cocok dalam cart!");
+                }
+            }
+            else
+            {
+                MessageBox.Show("Tidak ada barang dalam cart!");
+            }
+        }
+
+
+        //-------------Function for action---------------
+        private void UpdateTotalPrice()
+        {
+            totalPrice = 0;
+            foreach (DataGridViewRow row in dataGridView2.Rows)
+            {
+                if (row.Cells["Subtotal"].Value != null)
+                {
+                    string subtotalValue = row.Cells["Subtotal"].Value.ToString();
+                    if (decimal.TryParse(subtotalValue.Replace("Rp", "").Replace(".", "").Trim(), out decimal subtotal))
+                    {
+                        totalPrice += subtotal;
+                    }
+                }
+            }
+            labeltotalprice.Text = string.Format(new System.Globalization.CultureInfo("id-ID"), "Total: Rp {0:N0}", totalPrice);
+        }
+
+        private void LoadProductDetailsFromDatabase(string productName)
+        {
+            string query = "SELECT p.id_produk, p.harga, p.stok, p.nama_produk, m.nama_merk, j.nama_jenis, k.nama_kategori " +
+                           "FROM produk p " +
+                           "LEFT JOIN merk m ON p.id_merk = m.id_merk " +
+                           "LEFT JOIN jenis j ON p.jenis = j.id_jenis " +
+                           "LEFT JOIN kategori k ON p.kategori = k.id_kategori " +
+                           "WHERE p.nama_produk = @ProductName";
+
+
+            MySqlCommand command = new MySqlCommand(query, conn);
+            command.Parameters.AddWithValue("@ProductName", productName);
+
+            try
+            {
+
+                MySqlDataReader reader = command.ExecuteReader();
+
+                if (reader.Read())
+                {
+                    textproductid.Text = reader["id_produk"].ToString();
+                    textproductname.Text = reader["nama_produk"].ToString();
+                    textprice.Text = Convert.ToDecimal(reader["harga"]).ToString("N0");
+                    textstok.Text = reader["stok"].ToString();
+                    textmerk.Text = reader["nama_merk"].ToString();
+                    textjenis.Text = reader["nama_jenis"].ToString();
+                    textcategory.Text = reader["nama_kategori"].ToString();
+                }
+
+                reader.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error saat mengambil data produk: " + ex.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+        }
+        private void FilterDataGridView(string searchQuery)
+        {
+            string query = @"
+        SELECT 
+            p.id_produk, 
+            p.nama_produk, 
+            m.nama_merk, 
+            p.stok, 
+            p.harga 
+        FROM produk p 
+        LEFT JOIN merk m ON p.id_merk = m.id_merk 
+        WHERE p.nama_produk LIKE @searchQuery";
+
+
+            try
+            {
+
+
+                MySqlCommand cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@searchQuery", "%" + searchQuery + "%");
+
+                MySqlDataAdapter adapter = new MySqlDataAdapter(cmd);
+                DataTable dt = new DataTable();
+                adapter.Fill(dt);
+
+                dataGridView1.DataSource = dt;
+
+                dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Terjadi kesalahan saat mengambil data: " + ex.Message);
+            }
+
+        }
+
+
+        private void clear()
+        {
+            btnadd.Enabled = true;
+            textproductid.Text = "";
+            textcategory.Text = "";
+            numquantity.Value = 0;
+            textproductname.Text = "";
+            textprice.Text = "";
+            textmerk.Text = "";
+            textjenis.Text = "";
+            textstok.Text = "";
+            btnupdate.Enabled = false;
+            btndelete.Enabled = false;
+        }
+
+        private decimal GetPriceFromDatabase(string productName)
+        {
+            decimal price = 0;
+
+            string query = "SELECT harga FROM produk WHERE nama_produk = @ProductName";
+
+                using (MySqlCommand command = new MySqlCommand(query, conn))
+                {
+                    command.Parameters.AddWithValue("@ProductName", productName);
+
+                    object result = command.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        price = Convert.ToDecimal(result);
+                    }
+                }
+
+            return price;
+        }
+
+        private void cashier_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void dataGridView2_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
+        }
+    }
+
+}
