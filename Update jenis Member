@@ -1,0 +1,71 @@
+int SelectedMemberId;
+        bool isLifetime;
+        private void dgvMember_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if(e.RowIndex >= 0)
+            {
+                button19.Enabled = true;
+                var selectedrow = dgvMember.Rows[e.RowIndex];
+                isLifetime = Convert.ToBoolean(selectedrow.Cells["lifetime"].Value);
+                textBox7.Text = selectedrow.Cells["ID"].Value.ToString();
+                SelectedMemberId = Convert.ToInt32(selectedrow.Cells["ID"].Value);
+                textBox6.Text = selectedrow.Cells["Nama"].Value.ToString();
+                numericUpDownBiayaRegis.Value = Convert.ToDecimal(selectedrow.Cells["Biaya"].Value);
+                tbDeskripsiMember.Text = selectedrow.Cells["Deskripsi"].Value.ToString();
+
+                if (isLifetime)
+                {
+                    dateTimePicker2.Enabled = false;
+                }
+                else
+                {
+                    dateTimePicker2.Enabled = true;
+                }
+            }
+        }
+
+        private void button36_Click(object sender, EventArgs e)
+        {
+            string updateQuery = @"
+    UPDATE jenis_member
+    SET 
+        nama_member = @Nama, 
+        biaya_registrasi = @Biaya, 
+        description = @Deskripsi,
+        expired_date = @ExpiredDate
+    WHERE 
+        ID = @ID;";
+
+            using (MySqlCommand updateCmd = new MySqlCommand(updateQuery, conn))
+            {
+                updateCmd.Parameters.AddWithValue("@Nama", textBox6.Text);
+                updateCmd.Parameters.AddWithValue("@Biaya", numericUpDownBiayaRegis.Value);
+                updateCmd.Parameters.AddWithValue("@Deskripsi", tbDeskripsiMember.Text);
+                updateCmd.Parameters.AddWithValue("@ID", SelectedMemberId);
+                if (isLifetime)
+                {
+                    updateCmd.Parameters.AddWithValue("@ExpiredDate", DBNull.Value);
+                }
+                else
+                {
+                    updateCmd.Parameters.AddWithValue("@ExpiredDate", dateTimePicker2.Value);
+                }
+
+                try
+                {
+                    int rowsAffected = updateCmd.ExecuteNonQuery();
+                    if (rowsAffected > 0)
+                    {
+                        MessageBox.Show("Data member berhasil diperbarui.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Tidak ada data yang diperbarui. Periksa kembali ID member.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Terjadi kesalahan saat memperbarui data: " + ex.Message);
+                }
+            }
+        }
