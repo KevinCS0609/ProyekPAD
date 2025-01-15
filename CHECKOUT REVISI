@@ -239,13 +239,10 @@ namespace Manager
                     }
 
                     // Calculate final discounts
-
-
-                    // Use the actual calculated values for the database
                     string htransQuery = @"
-                INSERT INTO htrans (id_pegawai, tanggal_transaksi, subtotal, grandtotal, pajak, metode_pembayaran)
-                VALUES (@idPegawai, @tanggalTransaksi, @subtotal, @grandtotal, @pajak, @metodePembayaran);
-                SELECT LAST_INSERT_ID();";
+            INSERT INTO htrans (id_pegawai, tanggal_transaksi, subtotal, grandtotal, pajak, metode_pembayaran)
+            VALUES (@idPegawai, @tanggalTransaksi, @subtotal, @grandtotal, @pajak, @metodePembayaran);
+            SELECT LAST_INSERT_ID();";
 
                     MySqlCommand htransCommand = new MySqlCommand(htransQuery, conn, transaction);
                     htransCommand.Parameters.AddWithValue("@idPegawai", idpegawai);
@@ -258,13 +255,13 @@ namespace Manager
                     idHtrans = Convert.ToInt32(htransCommand.ExecuteScalar());
 
                     string updateStockQuery = @"
-                UPDATE produk 
-                SET stok = stok - @jumlah 
-                WHERE id_produk = @idProduk;";
+            UPDATE produk 
+            SET stok = stok - @jumlah 
+            WHERE id_produk = @idProduk;";
 
                     string dtransQuery = @"
-                INSERT INTO dtrans (id_htrans, id_produk, nama_produk, jumlah, subtotal, diskon)
-                VALUES (@idHtrans, @idProduk, @namaProduk, @jumlah, @subtotal, @diskon);";
+            INSERT INTO dtrans (id_htrans, id_produk, nama_produk, jumlah, subtotal, diskon)
+            VALUES (@idHtrans, @idProduk, @namaProduk, @jumlah, @subtotal, @diskon);";
 
                     foreach (DataGridViewRow row in dataGridView1.Rows)
                     {
@@ -272,23 +269,29 @@ namespace Manager
                         {
                             int idProduk = Convert.ToInt32(row.Cells["id_produk"].Value);
                             decimal promoDiskon = promoDiscounts.FirstOrDefault(d => d.Item1 == idProduk)?.Item2 ?? 0;
-
-                            // Get member discount for this product (if any)
                             decimal memberDiskon = memberDiscounts?.FirstOrDefault(d => d.Item1 == idProduk)?.Item2 ?? 0;
 
-                            // Combine both discounts
-                            decimal diskon = promoDiskon + memberDiskon;
+                            // Compare member and promo discount and apply the better one
+                            decimal bestDiscount = Math.Max(promoDiskon, memberDiskon); // Select the better discount
 
+                            // Calculate the discount for this product
+                            decimal productSubtotal = Convert.ToDecimal(row.Cells["subtotal"].Value);
+                            decimal productStock = Convert.ToDecimal(row.Cells["stok"].Value);
+                            MessageBox.Show(bestDiscount.ToString());
+                            decimal discountAmount = (bestDiscount * productStock) ;
+
+                            // Now, we insert the product-specific discount into the dtrans table
                             MySqlCommand dtransCommand = new MySqlCommand(dtransQuery, conn, transaction);
                             dtransCommand.Parameters.AddWithValue("@idHtrans", idHtrans);
                             dtransCommand.Parameters.AddWithValue("@idProduk", idProduk);
                             dtransCommand.Parameters.AddWithValue("@namaProduk", row.Cells["nama_produk"].Value);
                             dtransCommand.Parameters.AddWithValue("@jumlah", row.Cells["stok"].Value);
-                            dtransCommand.Parameters.AddWithValue("@subtotal", row.Cells["subtotal"].Value);
-                            dtransCommand.Parameters.AddWithValue("@diskon", diskon);
+                            dtransCommand.Parameters.AddWithValue("@subtotal", productSubtotal);
+                            dtransCommand.Parameters.AddWithValue("@diskon", discountAmount); // Store the discount for this specific product
 
                             dtransCommand.ExecuteNonQuery();
 
+                            // Update stock after the transaction
                             MySqlCommand updateStockCommand = new MySqlCommand(updateStockQuery, conn, transaction);
                             updateStockCommand.Parameters.AddWithValue("@jumlah", row.Cells["stok"].Value);
                             updateStockCommand.Parameters.AddWithValue("@idProduk", idProduk);
@@ -314,6 +317,9 @@ namespace Manager
                 MessageBox.Show("Masukkan metode pembayaran!");
             }
         }
+
+
+
         private void UpdateLabels()
         {
             // Total jumlah item
@@ -526,18 +532,47 @@ namespace Manager
             diskonMember = 0; // Reset member discount
             decimal diskonPromo = 0; // Reset promo discount
 
+            // Query to get the status of the member type
+            string jenisMemberStatusQuery = @"
+SELECT status
+FROM jenis_member
+WHERE id = @idJenisMember";
+
             string discountQuery = @"
-    SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
-    FROM member_discount_rules mdr
-    JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
-    WHERE jm.id = @idJenisMember";
+SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
+FROM member_discount_rules mdr
+JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
+WHERE jm.id = @idJenisMember AND jm.status = 'Active'";
 
             string promoQuery = @"
-    SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
-    FROM promo p
-    JOIN promo_rules pr ON p.id_promo = pr.id_promo
-    WHERE p.status = 'active'";
+SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
+FROM promo p
+JOIN promo_rules pr ON p.id_promo = pr.id_promo
+WHERE p.status = 'active'";
 
+            // Check the status of the member type
+            string statusJenisMember = "";
+            using (MySqlCommand statusCmd = new MySqlCommand(jenisMemberStatusQuery, conn))
+            {
+                statusCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
+                using (MySqlDataReader statusReader = statusCmd.ExecuteReader())
+                {
+                    if (statusReader.Read())
+                    {
+                        statusJenisMember = statusReader.GetString("status");
+                    }
+                }
+            }
+
+            // If the member type status is not "Active", no member discount is applied
+            if (statusJenisMember != "Active")
+            {
+                diskonMember = 0;
+                MessageBox.Show("Jenis Member tidak aktif atau expired. Diskon Member tidak dapat diterapkan.");
+                return discounts;  // Stop the process if the status is not active
+            }
+
+            // Loop through each product
             foreach (var product in productIds)
             {
                 int idProduk = product.Item1;
@@ -546,9 +581,9 @@ namespace Manager
                 decimal totalPromoDiscount = 0;
 
                 string productQuery = @"
-        SELECT p.id_produk, p.kategori, p.id_merk, p.harga
-        FROM produk p
-        WHERE p.id_produk = @ProductId";
+SELECT p.id_produk, p.kategori, p.id_merk, p.harga
+FROM produk p
+WHERE p.id_produk = @ProductId";
 
                 decimal productPrice = 0;
                 int productCategoryId = 0;
@@ -569,11 +604,11 @@ namespace Manager
                     }
                 }
 
-                // Check and apply member discount rules
+                // Apply member discount
+                List<decimal> memberDiscounts = new List<decimal>(); // Store all member discounts for comparison
                 using (MySqlCommand discountCmd = new MySqlCommand(discountQuery, conn))
                 {
                     discountCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
-                    discountCmd.Parameters.AddWithValue("@currentDate", DateTime.Now);
 
                     using (MySqlDataReader discountReader = discountCmd.ExecuteReader())
                     {
@@ -587,13 +622,13 @@ namespace Manager
                                 (discountType == "merk" && productBrandId == idTarget) ||
                                 (discountType == "produk" && idProduk == idTarget))
                             {
-                                totalMemberDiscount += discountPercent;
+                                memberDiscounts.Add(discountPercent); // Store the discount for comparison
                             }
                         }
                     }
                 }
 
-                // Check if a promo rule exists
+                // Apply promo discount (this part is kept as is, but we're not comparing it with the member discount yet)
                 using (MySqlCommand promoCmd = new MySqlCommand(promoQuery, conn))
                 {
                     using (MySqlDataReader promoReader = promoCmd.ExecuteReader())
@@ -614,23 +649,41 @@ namespace Manager
                     }
                 }
 
-                // Compare the two discount types and apply the largest discount
-                decimal bestDiscountPercent = Math.Max(totalMemberDiscount, totalPromoDiscount);
+                // Now, compare the member discounts only to get the best one (largest member discount)
+                decimal bestMemberDiscount = memberDiscounts.Count > 0 ? memberDiscounts.Max() : 0; // Find the largest member discount
 
-                // If there is a valid discount, calculate the discount amount
+                // Apply the largest member discount or promo discount (whichever is greater)
+                decimal bestDiscountPercent = Math.Max(bestMemberDiscount, totalPromoDiscount); // Compare with promo discount
+
+                // If there's a valid discount, calculate the discount amount for this product
                 if (bestDiscountPercent > 0)
                 {
                     decimal discountAmount = (bestDiscountPercent * productPrice * quantity) / 100;
                     discounts.Add(Tuple.Create(idProduk, discountAmount));
-                    diskonMember += discountAmount;
+
+                    // Update the total member discount (if applicable)
+                    if (bestDiscountPercent == bestMemberDiscount)
+                    {
+                        diskonMember += discountAmount;
+                    }
+                    else
+                    {
+                        diskonPromo += discountAmount;
+                    }
                 }
             }
 
-            // Update total discount and UI
+            // Update total discount and UI (if needed)
+
             totalDiskon = diskonPromo + diskonMember;
             UpdateDiscountDisplay();
+
             return discounts;
         }
+
+
+
+
 
 
 
