@@ -46,13 +46,14 @@ int SelectedMemberId;
 
         private void button36_Click(object sender, EventArgs e)
         {
-            string updateQuery = @"
+           string updateQuery = @"
     UPDATE jenis_member
     SET 
         nama_member = @Nama, 
         biaya_registrasi = @Biaya, 
         description = @Deskripsi,
-        expired_date = @ExpiredDate
+        expired_date = @ExpiredDate,
+        status = @status
     WHERE 
         ID = @ID;";
 
@@ -62,6 +63,14 @@ int SelectedMemberId;
                 updateCmd.Parameters.AddWithValue("@Biaya", numericUpDownBiayaRegis.Value);
                 updateCmd.Parameters.AddWithValue("@Deskripsi", tbDeskripsiMember.Text);
                 updateCmd.Parameters.AddWithValue("@ID", SelectedMemberId);
+                if(dateTimePicker2.Value < DateTime.Now)
+                {
+                    updateCmd.Parameters.AddWithValue("@status", "Expired");
+                }
+                else
+                {
+                    updateCmd.Parameters.AddWithValue("@status", "Active");
+                }
                 if (isLifetime)
                 {
                     updateCmd.Parameters.AddWithValue("@ExpiredDate", DBNull.Value);
