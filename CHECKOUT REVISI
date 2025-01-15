@@ -524,33 +524,37 @@ namespace Manager
         {
             List<Tuple<int, decimal>> discounts = new List<Tuple<int, decimal>>();
             diskonMember = 0; // Reset member discount
-
+            decimal diskonPromo = 0; // Reset promo discount
 
             string discountQuery = @"
-            SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
-            FROM member_discount_rules mdr
-            JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
-            WHERE jm.id = @idJenisMember";
+    SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
+    FROM member_discount_rules mdr
+    JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
+    WHERE jm.id = @idJenisMember";
 
-            
+            string promoQuery = @"
+    SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
+    FROM promo p
+    JOIN promo_rules pr ON p.id_promo = pr.id_promo
+    WHERE p.status = 'active'";
 
             foreach (var product in productIds)
             {
                 int idProduk = product.Item1;
                 int quantity = product.Item2;
                 decimal totalMemberDiscount = 0;
+                decimal totalPromoDiscount = 0;
 
                 string productQuery = @"
-                SELECT p.id_produk, p.kategori, p.id_merk, p.harga
-                FROM produk p
-                WHERE p.id_produk = @ProductId";
+        SELECT p.id_produk, p.kategori, p.id_merk, p.harga
+        FROM produk p
+        WHERE p.id_produk = @ProductId";
 
                 decimal productPrice = 0;
                 int productCategoryId = 0;
                 int productBrandId = 0;
 
-
-
+                // Get product details
                 using (MySqlCommand cmd = new MySqlCommand(productQuery, conn))
                 {
                     cmd.Parameters.AddWithValue("@ProductId", idProduk);
@@ -564,7 +568,8 @@ namespace Manager
                         }
                     }
                 }
-                
+
+                // Check and apply member discount rules
                 using (MySqlCommand discountCmd = new MySqlCommand(discountQuery, conn))
                 {
                     discountCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
@@ -574,8 +579,8 @@ namespace Manager
                     {
                         while (discountReader.Read())
                         {
-                            discountType = discountReader.GetString("tipe_target");
-                            idTarget = discountReader.GetInt32("id_target");
+                            string discountType = discountReader.GetString("tipe_target");
+                            int idTarget = discountReader.GetInt32("id_target");
                             decimal discountPercent = discountReader.GetDecimal("diskon_persen");
 
                             if ((discountType == "kategori" && productCategoryId == idTarget) ||
@@ -587,36 +592,35 @@ namespace Manager
                         }
                     }
                 }
-                string checkQuery = @"
-    SELECT COUNT(*)
-    FROM member_discount_rules mdr
-    JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
-    WHERE jm.id = @idJenisMember 
-      AND jm.status = 'Active'
-      AND mdr.tipe_target = @tipeTarget
-      AND mdr.id_target = @idTarget";
 
-                using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
+                // Check if a promo rule exists
+                using (MySqlCommand promoCmd = new MySqlCommand(promoQuery, conn))
                 {
-                    checkCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
-                    checkCmd.Parameters.AddWithValue("@tipeTarget", discountType);
-                    checkCmd.Parameters.AddWithValue("@idTarget", idTarget);
-
-                    int ruleCount = Convert.ToInt32(checkCmd.ExecuteScalar());
-
-                    if (ruleCount > 0)
+                    using (MySqlDataReader promoReader = promoCmd.ExecuteReader())
                     {
-                        MessageBox.Show("Aturan dengan tipe target dan ID target yang sama sudah ada.");
-                    }
-                    else
-                    {
-                        MessageBox.Show("Tidak ada aturan diskon yang cocok.");
+                        while (promoReader.Read())
+                        {
+                            string promoType = promoReader.GetString("tipe_target");
+                            int idTarget = promoReader.GetInt32("id_target");
+                            decimal discountPercent = promoReader.GetDecimal("diskon_persen");
+
+                            if ((promoType == "kategori" && productCategoryId == idTarget) ||
+                                (promoType == "merk" && productBrandId == idTarget) ||
+                                (promoType == "produk" && idProduk == idTarget))
+                            {
+                                totalPromoDiscount += discountPercent;
+                            }
+                        }
                     }
                 }
 
-                if (totalMemberDiscount > 0)
+                // Compare the two discount types and apply the largest discount
+                decimal bestDiscountPercent = Math.Max(totalMemberDiscount, totalPromoDiscount);
+
+                // If there is a valid discount, calculate the discount amount
+                if (bestDiscountPercent > 0)
                 {
-                    decimal discountAmount = (totalMemberDiscount * productPrice * quantity) / 100;
+                    decimal discountAmount = (bestDiscountPercent * productPrice * quantity) / 100;
                     discounts.Add(Tuple.Create(idProduk, discountAmount));
                     diskonMember += discountAmount;
                 }
@@ -628,7 +632,8 @@ namespace Manager
             return discounts;
         }
 
-        
+
+
 
     }
 }
