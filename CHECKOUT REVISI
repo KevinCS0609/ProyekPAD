@@ -433,10 +433,10 @@ namespace Manager
             diskonPromo = 0; // Reset promo discount
 
             string promoQuery = @"
-            SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
-            FROM promo p
-            JOIN promo_rules pr ON p.id_promo = pr.id_promo
-            WHERE p.status = 'active'";
+    SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
+    FROM promo p
+    JOIN promo_rules pr ON p.id_promo = pr.id_promo
+    WHERE p.status = 'active'";
 
             foreach (var product in productIds)
             {
@@ -445,9 +445,9 @@ namespace Manager
                 decimal totalPromoDiscount = 0;
 
                 string productQuery = @"
-                SELECT p.id_produk, p.kategori, p.id_merk, p.harga
-                FROM produk p
-                WHERE p.id_produk = @ProductId";
+        SELECT p.id_produk, p.kategori, p.id_merk, p.harga
+        FROM produk p
+        WHERE p.id_produk = @ProductId";
 
                 decimal productPrice = 0;
                 int productCategoryId = 0;
@@ -467,6 +467,8 @@ namespace Manager
                     }
                 }
 
+                decimal maxPromoDiscount = 0; // Variable to store the maximum discount found
+
                 using (MySqlCommand promoCmd = new MySqlCommand(promoQuery, conn))
                 {
                     using (MySqlDataReader promoReader = promoCmd.ExecuteReader())
@@ -477,19 +479,25 @@ namespace Manager
                             int idTarget = promoReader.GetInt32("id_target");
                             decimal discountPercent = promoReader.GetDecimal("diskon_persen");
 
+                            // Check if the promo is applicable to this product
                             if ((promoType == "kategori" && productCategoryId == idTarget) ||
                                 (promoType == "merk" && productBrandId == idTarget) ||
                                 (promoType == "produk" && idProduk == idTarget))
                             {
-                                totalPromoDiscount += discountPercent;
+                                // Only update if we found a larger discount
+                                if (discountPercent > maxPromoDiscount)
+                                {
+                                    maxPromoDiscount = discountPercent;
+                                }
                             }
                         }
                     }
                 }
 
-                if (totalPromoDiscount > 0)
+                // If a promo discount was applied (maxPromoDiscount > 0), calculate the discount amount
+                if (maxPromoDiscount > 0)
                 {
-                    decimal discountAmount = (totalPromoDiscount * productPrice * quantity) / 100;
+                    decimal discountAmount = (maxPromoDiscount * productPrice * quantity) / 100;
                     discounts.Add(Tuple.Create(idProduk, discountAmount));
                     diskonPromo += discountAmount;
                 }
@@ -500,6 +508,8 @@ namespace Manager
             UpdateDiscountDisplay();
             return discounts;
         }
+
+
 
         private void UpdateDiscountDisplay()
         {
