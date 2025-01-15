@@ -1,3 +1,23 @@
+private void loadDGVMember()
+        {
+            try
+            {
+            dgvMember.Controls.Clear();
+            string query = "SELECT id AS 'ID', nama_member 'Nama',lifetime, description 'Deskripsi', expired_date AS 'Expired Date', biaya_registrasi AS 'Biaya',status FROM jenis_member";
+
+            MySqlDataAdapter adapter = new MySqlDataAdapter(query, conn);
+            DataTable dt = new DataTable();
+            adapter.Fill(dt);
+            dgvMember.DataSource = dt;
+            dgvMember.Columns["lifetime"].Visible = false;
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+
 int SelectedMemberId;
         bool isLifetime;
         private void dgvMember_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
