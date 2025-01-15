@@ -11,27 +11,31 @@ namespace Manager
     {
         cashier cash;
         MySqlConnection conn = koneksi.getConn();
-        decimal diskon = 0;
-        decimal diskonpromo, diskonmember;
+        decimal diskonPromo = 0;
+        decimal diskonMember = 0;
+        decimal totalDiskon = 0;
         string name;
         int idpegawai;
-        List<Tuple<int, decimal>> finalDiscounts;
+        List<Tuple<int, decimal>> promoDiscounts;
+        List<Tuple<int, decimal>> memberDiscounts;
         List<Tuple<int, int>> productIds;
+
         public checkout(cashier cash, List<Tuple<int, int>> idProduk, string name, int idpegawai)
         {
             InitializeComponent();
             this.idpegawai = idpegawai;
             this.cash = cash;
             this.name = name;
-            productIds = this.productIds;
+            productIds = idProduk;
             PopulateDataGridView(idProduk);
-            ApplyPromo(idProduk);
+            // Apply promo discounts immediately
+            promoDiscounts = ApplyPromo(idProduk);
             Updatesum();
             LoadPaymentMethods();
-            //------------default-----------------
             buttondefault(btncheckout);
             buttondefault(btnedit);
         }
+
 
         //------------default ---------------
         private void buttondefault(Button temp)
@@ -45,29 +49,29 @@ namespace Manager
             string query = "SELECT id_metode, nama_pembayaran FROM pembayaran";
 
 
-                try
+            try
+            {
+
+                using (MySqlCommand command = new MySqlCommand(query, conn))
                 {
-
-                    using (MySqlCommand command = new MySqlCommand(query, conn))
+                    using (MySqlDataReader reader = command.ExecuteReader())
                     {
-                        using (MySqlDataReader reader = command.ExecuteReader())
-                        {
-                            boxpembayaran.Items.Clear();
+                        boxpembayaran.Items.Clear();
 
-                            while (reader.Read())
-                            {
-                                string paymentName = reader["nama_pembayaran"].ToString();
-                                boxpembayaran.Items.Add(paymentName);
-                            }
+                        while (reader.Read())
+                        {
+                            string paymentName = reader["nama_pembayaran"].ToString();
+                            boxpembayaran.Items.Add(paymentName);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Error saat mengambil data metode pembayaran: " + ex.Message,
-                        "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error saat mengambil data metode pembayaran: " + ex.Message,
+                    "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
         }
 
         //------------properties action-----------------
@@ -81,7 +85,7 @@ namespace Manager
         private void PopulateDataGridView(List<Tuple<int, int>> productIds)
         {
 
-                string query = @"
+            string query = @"
         SELECT 
             p.id_produk,
             p.nama_produk,
@@ -93,62 +97,89 @@ namespace Manager
         JOIN kategori k ON p.kategori = k.id_kategori
         WHERE p.id_produk = @ProductId";
 
-                DataTable dbProducts = new DataTable();
+            DataTable dbProducts = new DataTable();
 
-                dbProducts.Columns.Add("id_produk", typeof(int));
-                dbProducts.Columns.Add("nama_produk", typeof(string));
-                dbProducts.Columns.Add("nama_merk", typeof(string));
-                dbProducts.Columns.Add("nama_kategori", typeof(string));
-                dbProducts.Columns.Add("harga", typeof(decimal));
-                dbProducts.Columns.Add("stok", typeof(int));
-                dbProducts.Columns.Add("subtotal", typeof(decimal));
+            dbProducts.Columns.Add("id_produk", typeof(int));
+            dbProducts.Columns.Add("nama_produk", typeof(string));
+            dbProducts.Columns.Add("nama_merk", typeof(string));
+            dbProducts.Columns.Add("nama_kategori", typeof(string));
+            dbProducts.Columns.Add("harga", typeof(decimal));
+            dbProducts.Columns.Add("stok", typeof(int));
+            dbProducts.Columns.Add("subtotal", typeof(decimal));
 
-                foreach (var product in productIds)
+            foreach (var product in productIds)
+            {
+                int idProduk = product.Item1;
+                int quantity = product.Item2;
+
+                using (MySqlCommand command = new MySqlCommand(query, conn))
                 {
-                    int idProduk = product.Item1;
-                    int quantity = product.Item2;
+                    command.Parameters.AddWithValue("@ProductId", idProduk);
 
-                    using (MySqlCommand command = new MySqlCommand(query, conn))
+                    try
                     {
-                        command.Parameters.AddWithValue("@ProductId", idProduk);
-
-                        try
+                        using (MySqlDataReader reader = command.ExecuteReader())
                         {
-                            using (MySqlDataReader reader = command.ExecuteReader())
+                            if (reader.HasRows)
                             {
-                                if (reader.HasRows)
+                                while (reader.Read())
                                 {
-                                    while (reader.Read())
-                                    {
-                                        DataRow dr = dbProducts.NewRow();
-                                        dr["id_produk"] = reader["id_produk"];
-                                        dr["nama_produk"] = reader["nama_produk"];
-                                        dr["nama_merk"] = reader["nama_merk"];
-                                        dr["nama_kategori"] = reader["nama_kategori"];
-                                        dr["harga"] = reader["harga"];
-                                        dr["stok"] = quantity;
-                                        dr["subtotal"] = quantity * Convert.ToDecimal(reader["harga"]);
+                                    DataRow dr = dbProducts.NewRow();
+                                    dr["id_produk"] = reader["id_produk"];
+                                    dr["nama_produk"] = reader["nama_produk"];
+                                    dr["nama_merk"] = reader["nama_merk"];
+                                    dr["nama_kategori"] = reader["nama_kategori"];
+                                    dr["harga"] = reader["harga"];
+                                    dr["stok"] = quantity;
+                                    dr["subtotal"] = quantity * Convert.ToDecimal(reader["harga"]);
 
-                                        dbProducts.Rows.Add(dr);
-                                    }
+                                    dbProducts.Rows.Add(dr);
                                 }
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show("Error saat mengambil data produk: " + ex.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Error saat mengambil data produk: " + ex.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                 }
+            }
             dataGridView1.DataSource = dbProducts;
-            finalDiscounts = CalculateFinalDiscounts(productIds, jenis_member);
-            
+
+
         }
         int totalProducts = 0;
         int totalQuantity = 0;
         decimal grandtotal = 0;
         decimal totalPrice = 0;
         decimal pajak = 0;
+        private void UpdateSum()
+        {
+            totalProducts = 0;
+            totalQuantity = 0;
+            totalPrice = 0;
+
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                if (!row.IsNewRow)
+                {
+                    totalProducts++;
+                    int quantity = Convert.ToInt32(row.Cells["stok"].Value ?? 0);
+                    decimal subtotal = Convert.ToDecimal(row.Cells["subtotal"].Value ?? 0);
+
+                    totalQuantity += quantity;
+                    totalPrice += subtotal;
+                }
+            }
+            pajak = ((totalPrice - totalDiskon) * 11) / 100;
+            grandtotal = totalPrice - totalDiskon + pajak;
+
+            totalproduk.Text = $"Total Products: {totalProducts}";
+            totalquantity.Text = $"Total Quantity: {totalQuantity}";
+            labelSubtotal.Text = $"Rp {totalPrice:N0}";
+            labelPajak.Text = $"Rp {pajak:N0}";
+            labelGrandtotal.Text = $"Rp {grandtotal:N0}";
+        }
         private void Updatesum()
         {
             totalProducts = 0;
@@ -167,9 +198,9 @@ namespace Manager
                     totalPrice += subtotal;
                 }
             }
-            pajak = ((totalPrice - diskon) * 11) / 100;
-            // Calculate grand total including tax and discounts
-            grandtotal = totalPrice - diskon + pajak;
+
+            pajak = ((totalPrice - totalDiskon) * 11) / 100;
+            grandtotal = totalPrice - totalDiskon + pajak;
 
             totalproduk.Text = $"Total Products: {totalProducts}";
             totalquantity.Text = $"Total Quantity: {totalQuantity}";
@@ -177,6 +208,7 @@ namespace Manager
             labelPajak.Text = $"Rp {pajak:N0}";
             labelGrandtotal.Text = $"Rp {grandtotal:N0}";
         }
+
 
         int idHtrans;
         private void btncheckout_Click(object sender, EventArgs e)
@@ -207,7 +239,7 @@ namespace Manager
                     }
 
                     // Calculate final discounts
-                    
+
 
                     // Use the actual calculated values for the database
                     string htransQuery = @"
@@ -239,7 +271,13 @@ namespace Manager
                         if (!row.IsNewRow)
                         {
                             int idProduk = Convert.ToInt32(row.Cells["id_produk"].Value);
-                            decimal diskon = finalDiscounts.FirstOrDefault(d => d.Item1 == idProduk)?.Item2 ?? 0;
+                            decimal promoDiskon = promoDiscounts.FirstOrDefault(d => d.Item1 == idProduk)?.Item2 ?? 0;
+
+                            // Get member discount for this product (if any)
+                            decimal memberDiskon = memberDiscounts?.FirstOrDefault(d => d.Item1 == idProduk)?.Item2 ?? 0;
+
+                            // Combine both discounts
+                            decimal diskon = promoDiskon + memberDiskon;
 
                             MySqlCommand dtransCommand = new MySqlCommand(dtransQuery, conn, transaction);
                             dtransCommand.Parameters.AddWithValue("@idHtrans", idHtrans);
@@ -315,88 +353,101 @@ namespace Manager
             koneksi.closeConn();
             Member m = new Member();
             m.ShowDialog();
-            if(m.jenis_member != 0)
+            if (m.jenis_member != 0)
             {
                 idMember = m.idMember;
                 labelNomorID.Text = idMember;
                 labelNomorID.Visible = true;
                 label6.Visible = true;
                 jenis_member = m.jenis_member;
-                cekMember();
+
+                // Apply member discount after member selection
+                memberDiscounts = ApplyMemberDiscount(productIds, jenis_member);
             }
         }
 
         private void cekMember()
         {
-                string query = "SELECT * From jenis_member WHERE id = @id";
-                MySqlCommand cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@id", jenis_member);
+            string query = "SELECT * From jenis_member WHERE id = @id";
+            MySqlCommand cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@id", jenis_member);
 
-                try
+            try
+            {
+
+                using (MySqlDataReader reader = cmd.ExecuteReader())
                 {
-
-                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    if (reader.Read())
                     {
-                        if (reader.Read())
-                        {
-                            // Ambil nilai dari kolom lifetime
-                            int lifetime = Convert.ToInt32(reader["lifetime"]);
+                        int lifetime = Convert.ToInt32(reader["lifetime"]);
 
-                            if (lifetime == 1)
-                            {
-                                diskon = (totalPrice * 5)/100;
-                                LabelDiskon.Visible = true;
-                                HargaDiskon.Text = $"Rp {diskon:N0}";
-                                HargaDiskon.Visible = true;
-                                labelGrandtotal.Text = $"Rp {(totalPrice + pajak - diskon):N0}";
-                                diskonmember = diskon;
-                                finalDiscounts = CalculateFinalDiscounts(productIds, jenis_member);
-                        }
-                            else
-                            {
-                                DateTime expiredDate = Convert.ToDateTime(reader["expired_date"]);
-                                if (expiredDate < DateTime.Now)
-                                {
-                                    Console.WriteLine("Member ini bukan Lifetime dan sudah melewati tanggal kedaluwarsa.");
-                                }
-                                else
-                                {
-                                    Console.WriteLine("Member ini bukan Lifetime dan masih aktif.");
-                                }
-                            }
+                        // Apply member discounts
+                        memberDiscounts = ApplyMemberDiscount(productIds, jenis_member);
+
+                        if (lifetime == 1)
+                        {
+                            // For lifetime members, calculate additional 5% discount
+                            decimal additionalDiscount = (totalPrice * 5) / 100;
+                            diskonMember += additionalDiscount;
+                            totalDiskon = diskonPromo + diskonMember;
+
+                            // Update UI
+                            LabelDiskon.Visible = true;
+                            HargaDiskon.Text = $"Rp {totalDiskon:N0}";
+                            HargaDiskon.Visible = true;
+                            labelGrandtotal.Text = $"Rp {(totalPrice + pajak - totalDiskon):N0}";
                         }
                         else
                         {
-                            Console.WriteLine("Member tidak ditemukan.");
+                            DateTime expiredDate = Convert.ToDateTime(reader["expired_date"]);
+                            if (expiredDate < DateTime.Now)
+                            {
+                                MessageBox.Show("Member ini bukan Lifetime dan sudah melewati tanggal kedaluwarsa.");
+                                // Reset member discounts if expired
+                                memberDiscounts = new List<Tuple<int, decimal>>();
+                                diskonMember = 0;
+                                totalDiskon = diskonPromo;
+                            }
+                            else
+                            {
+                                MessageBox.Show("Member ini bukan Lifetime dan masih aktif.");
+                                // Keep the calculated member discounts
+                            }
                         }
+
+                        // Update all calculations
+                        Updatesum();
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Terjadi kesalahan: {ex.Message}");
-                }
-            
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Terjadi kesalahan: {ex.Message}");
+            }
+
         }
 
         private List<Tuple<int, decimal>> ApplyPromo(List<Tuple<int, int>> productIds)
         {
             List<Tuple<int, decimal>> discounts = new List<Tuple<int, decimal>>();
+            diskonPromo = 0; // Reset promo discount
 
             string promoQuery = @"
-        SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
-        FROM promo p
-        JOIN promo_rules pr ON p.id_promo = pr.id_promo
-        WHERE p.status = 'active'";
+            SELECT pr.id_rule, pr.tipe_target, pr.id_target, pr.diskon_persen
+            FROM promo p
+            JOIN promo_rules pr ON p.id_promo = pr.id_promo
+            WHERE p.status = 'active'";
 
             foreach (var product in productIds)
             {
                 int idProduk = product.Item1;
                 int quantity = product.Item2;
+                decimal totalPromoDiscount = 0;
 
                 string productQuery = @"
-            SELECT p.id_produk, p.kategori, p.id_merk, p.harga
-            FROM produk p
-            WHERE p.id_produk = @ProductId";
+                SELECT p.id_produk, p.kategori, p.id_merk, p.harga
+                FROM produk p
+                WHERE p.id_produk = @ProductId";
 
                 decimal productPrice = 0;
                 int productCategoryId = 0;
@@ -405,7 +456,6 @@ namespace Manager
                 using (MySqlCommand cmd = new MySqlCommand(productQuery, conn))
                 {
                     cmd.Parameters.AddWithValue("@ProductId", idProduk);
-
                     using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -416,8 +466,6 @@ namespace Manager
                         }
                     }
                 }
-
-                decimal bestDiscount = 0;
 
                 using (MySqlCommand promoCmd = new MySqlCommand(promoQuery, conn))
                 {
@@ -425,74 +473,77 @@ namespace Manager
                     {
                         while (promoReader.Read())
                         {
-                            decimal applicableDiscount = 0;
                             string promoType = promoReader.GetString("tipe_target");
                             int idTarget = promoReader.GetInt32("id_target");
+                            decimal discountPercent = promoReader.GetDecimal("diskon_persen");
 
-                            if (promoType == "kategori" && productCategoryId == idTarget)
+                            if ((promoType == "kategori" && productCategoryId == idTarget) ||
+                                (promoType == "merk" && productBrandId == idTarget) ||
+                                (promoType == "produk" && idProduk == idTarget))
                             {
-                                applicableDiscount = promoReader.GetDecimal("diskon_persen");
-
+                                totalPromoDiscount += discountPercent;
                             }
-                            else if (promoType == "merk" && productBrandId == idTarget)
-                            {
-                                applicableDiscount = promoReader.GetDecimal("diskon_persen");
-                            }
-                            else if (promoType == "produk" && idProduk == idTarget)
-                            {
-                                applicableDiscount = promoReader.GetDecimal("diskon_persen");
-                            }
-
-                            if (applicableDiscount > bestDiscount)
-                            {
-                                bestDiscount = applicableDiscount;
-                            }
-                            diskonpromo = applicableDiscount;
                         }
                     }
                 }
 
-                if (bestDiscount > 0)
+                if (totalPromoDiscount > 0)
                 {
-                    decimal discountAmount = (bestDiscount * productPrice * quantity) / 100;
+                    decimal discountAmount = (totalPromoDiscount * productPrice * quantity) / 100;
                     discounts.Add(Tuple.Create(idProduk, discountAmount));
+                    diskonPromo += discountAmount;
                 }
             }
 
+            // Update total discount and UI
+            totalDiskon = diskonPromo;
+            UpdateDiscountDisplay();
             return discounts;
         }
 
+        private void UpdateDiscountDisplay()
+        {
+            LabelDiskon.Visible = totalDiskon > 0;
+            HargaDiskon.Visible = totalDiskon > 0;
+            HargaDiskon.Text = $"Rp {totalDiskon:N0}";
+            Updatesum();
+        }
+        int idTarget;
+        string discountType;
         private List<Tuple<int, decimal>> ApplyMemberDiscount(List<Tuple<int, int>> productIds, int idJenisMember)
         {
             List<Tuple<int, decimal>> discounts = new List<Tuple<int, decimal>>();
+            diskonMember = 0; // Reset member discount
 
-            // Query untuk mendapatkan aturan diskon member
+
             string discountQuery = @"
-        SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
-        FROM member_discount_rules mdr
-        JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
-        WHERE jm.id = @idJenisMember AND 
-              (jm.lifetime = 1 OR jm.expired_date >= @currentDate)";
+            SELECT mdr.id_target, mdr.tipe_target, mdr.diskon_persen
+            FROM member_discount_rules mdr
+            JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
+            WHERE jm.id = @idJenisMember";
+
+            
 
             foreach (var product in productIds)
             {
                 int idProduk = product.Item1;
                 int quantity = product.Item2;
+                decimal totalMemberDiscount = 0;
 
-                // Query untuk mendapatkan detail produk
                 string productQuery = @"
-            SELECT p.id_produk, p.kategori, p.id_merk, p.harga
-            FROM produk p
-            WHERE p.id_produk = @ProductId";
+                SELECT p.id_produk, p.kategori, p.id_merk, p.harga
+                FROM produk p
+                WHERE p.id_produk = @ProductId";
 
                 decimal productPrice = 0;
                 int productCategoryId = 0;
                 int productBrandId = 0;
 
+
+
                 using (MySqlCommand cmd = new MySqlCommand(productQuery, conn))
                 {
                     cmd.Parameters.AddWithValue("@ProductId", idProduk);
-
                     using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -503,9 +554,7 @@ namespace Manager
                         }
                     }
                 }
-
-                decimal bestDiscount = 0;
-
+                
                 using (MySqlCommand discountCmd = new MySqlCommand(discountQuery, conn))
                 {
                     discountCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
@@ -515,159 +564,63 @@ namespace Manager
                     {
                         while (discountReader.Read())
                         {
-                            decimal applicableDiscount = 0;
-                            string discountType = discountReader.GetString("tipe_target");
-                            int idTarget = discountReader.GetInt32("id_target");
+                            discountType = discountReader.GetString("tipe_target");
+                            idTarget = discountReader.GetInt32("id_target");
+                            decimal discountPercent = discountReader.GetDecimal("diskon_persen");
 
-                            if (discountType == "kategori" && productCategoryId == idTarget)
+                            if ((discountType == "kategori" && productCategoryId == idTarget) ||
+                                (discountType == "merk" && productBrandId == idTarget) ||
+                                (discountType == "produk" && idProduk == idTarget))
                             {
-                                applicableDiscount = discountReader.GetDecimal("diskon_persen");
-                            }
-                            else if (discountType == "merk" && productBrandId == idTarget)
-                            {
-                                applicableDiscount = discountReader.GetDecimal("diskon_persen");
-                            }
-                            else if (discountType == "produk" && idProduk == idTarget)
-                            {
-                                applicableDiscount = discountReader.GetDecimal("diskon_persen");
-                            }
-
-                            if (applicableDiscount > bestDiscount)
-                            {
-                                bestDiscount = applicableDiscount;
+                                totalMemberDiscount += discountPercent;
                             }
                         }
                     }
                 }
+                string checkQuery = @"
+    SELECT COUNT(*)
+    FROM member_discount_rules mdr
+    JOIN jenis_member jm ON mdr.id_jenis_member = jm.id
+    WHERE jm.id = @idJenisMember 
+      AND jm.status = 'Active'
+      AND mdr.tipe_target = @tipeTarget
+      AND mdr.id_target = @idTarget";
 
-                if (bestDiscount > 0)
+                using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, conn))
                 {
-                    decimal discountAmount = (bestDiscount * productPrice * quantity) / 100;
+                    checkCmd.Parameters.AddWithValue("@idJenisMember", idJenisMember);
+                    checkCmd.Parameters.AddWithValue("@tipeTarget", discountType);
+                    checkCmd.Parameters.AddWithValue("@idTarget", idTarget);
+
+                    int ruleCount = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                    if (ruleCount > 0)
+                    {
+                        MessageBox.Show("Aturan dengan tipe target dan ID target yang sama sudah ada.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Tidak ada aturan diskon yang cocok.");
+                    }
+                }
+
+                if (totalMemberDiscount > 0)
+                {
+                    decimal discountAmount = (totalMemberDiscount * productPrice * quantity) / 100;
                     discounts.Add(Tuple.Create(idProduk, discountAmount));
+                    diskonMember += discountAmount;
                 }
             }
 
+            // Update total discount and UI
+            totalDiskon = diskonPromo + diskonMember;
+            UpdateDiscountDisplay();
             return discounts;
         }
 
+        
 
-        private List<Tuple<int, decimal>> CalculateFinalDiscounts(List<Tuple<int, int>> productIds, int idJenisMember)
-        {
-            List<Tuple<int, decimal>> promoDiscounts = ApplyPromo(productIds);
-            List<Tuple<int, decimal>> memberDiscounts = ApplyMemberDiscount(productIds, idJenisMember);
-            List<Tuple<int, decimal>> finalDiscounts = new List<Tuple<int, decimal>>();
-            decimal totalDiscount = 0;
-
-            foreach (var product in productIds)
-            {
-                int idProduk = product.Item1;
-                var promoDiscount = promoDiscounts.FirstOrDefault(d => d.Item1 == idProduk);
-                var memberDiscount = memberDiscounts.FirstOrDefault(d => d.Item1 == idProduk);
-
-                if (promoDiscount != null)
-                {
-                    finalDiscounts.Add(promoDiscount);
-                    totalDiscount += promoDiscount.Item2;
-                }
-                else if (memberDiscount != null)
-                {
-                    finalDiscounts.Add(memberDiscount);
-                    totalDiscount += memberDiscount.Item2;
-                }
-            }
-
-            // Update the total discount
-            diskon = totalDiscount;
-
-            // Update the UI
-            LabelDiskon.Visible = true;
-            HargaDiskon.Text = $"Rp {diskon:N0}";
-            HargaDiskon.Visible = true;
-            grandtotal = grandtotal - diskon;
-            labelGrandtotal.Text = $"Rp {grandtotal:N0}";
-            // Update all totals
-            Updatesum();
-
-            return finalDiscounts;
-        }
-        private List<Tuple<int, decimal>> CalculateDynamicDiscounts(List<Tuple<int, int>> productIds, int idJenisMember)
-        {
-            // Diskon akhir untuk produk (idProduk, totalDiskon)
-            var finalDiscounts = new Dictionary<int, decimal>();
-
-            // Variabel untuk menyimpan total diskon
-            decimal totalDiscount = 0;
-
-            // Dapatkan diskon dari promo
-            List<Tuple<int, decimal>> promoDiscounts = ApplyPromo(productIds);
-
-            // Perbarui diskon akhir dengan diskon promo
-            foreach (var promo in promoDiscounts)
-            {
-                int idProduk = promo.Item1;
-                decimal discount = promo.Item2;
-
-                // Tambahkan atau perbarui diskon di finalDiscounts
-                if (!finalDiscounts.ContainsKey(idProduk))
-                {
-                    finalDiscounts[idProduk] = 0;
-                }
-
-                // Promo memiliki prioritas tinggi, langsung tambahkan
-                finalDiscounts[idProduk] = discount;
-                totalDiscount += discount;
-            }
-
-            // Dapatkan diskon dari member
-            List<Tuple<int, decimal>> memberDiscounts = ApplyMemberDiscount(productIds, idJenisMember);
-
-            // Perbarui diskon akhir dengan diskon member jika belum ada diskon promo
-            foreach (var member in memberDiscounts)
-            {
-                int idProduk = member.Item1;
-                decimal discount = member.Item2;
-
-                // Jika tidak ada diskon promo atau aturan bisnis mengizinkan kombinasi diskon
-                if (!finalDiscounts.ContainsKey(idProduk))
-                {
-                    finalDiscounts[idProduk] = discount;
-                    totalDiscount += discount;
-                }
-                else
-                {
-                    // Contoh aturan: tambahkan diskon jika diskon member > diskon promo
-                    if (discount > finalDiscounts[idProduk])
-                    {
-                        totalDiscount -= finalDiscounts[idProduk]; // Kurangi diskon lama
-                        finalDiscounts[idProduk] = discount;
-                        totalDiscount += discount;
-                    }
-                }
-            }
-
-            // Jika ada diskon, perbarui label dan variabel diskon
-            if (totalDiscount > 0)
-            {
-                diskon = totalDiscount;
-
-                // Update tampilan
-                LabelDiskon.Visible = true;
-                HargaDiskon.Text = $"Rp {diskon:N0}";
-                HargaDiskon.Visible = true;
-                labelGrandtotal.Text = $"Rp {(totalPrice + pajak - diskon):N0}";
-            }
-            else
-            {
-                // Jika tidak ada diskon, sembunyikan label
-                LabelDiskon.Visible = false;
-                HargaDiskon.Visible = false;
-            }
-
-            // Konversi ke List<Tuple<int, decimal>> untuk hasil akhir
-            return finalDiscounts.Select(kv => Tuple.Create(kv.Key, kv.Value)).ToList();
-        }
     }
-
 }
 
 
