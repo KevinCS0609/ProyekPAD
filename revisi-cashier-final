@@ -521,16 +521,16 @@ namespace Manager
 
             string query = "SELECT harga FROM produk WHERE nama_produk = @ProductName";
 
-                using (MySqlCommand command = new MySqlCommand(query, conn))
-                {
-                    command.Parameters.AddWithValue("@ProductName", productName);
+            using (MySqlCommand command = new MySqlCommand(query, conn))
+            {
+                command.Parameters.AddWithValue("@ProductName", productName);
 
-                    object result = command.ExecuteScalar();
-                    if (result != null && result != DBNull.Value)
-                    {
-                        price = Convert.ToDecimal(result);
-                    }
+                object result = command.ExecuteScalar();
+                if (result != null && result != DBNull.Value)
+                {
+                    price = Convert.ToDecimal(result);
                 }
+            }
 
             return price;
         }
